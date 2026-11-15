@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block title %}Report an item | CampusFind{% endblock %}
+{% block content %}<div class="row justify-content-center"><div class="col-lg-8"><div class="card shadow-sm"><div class="card-body p-4">
+<h1 class="h3 mb-1">Create an item report</h1><p class="text-muted">Only the broad item type is publicly visible. The full name, image, description, exact location and identifying details are private to you and authorised staff.</p>
+<form method="post" enctype="multipart/form-data">{% csrf_token %}
+{% for field in form %}<div class="mb-3"><label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}{% for error in field.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}</div>{% endfor %}
+<button class="btn btn-primary">Submit private report</button><a href="{% url 'item_list' %}" class="btn btn-link">Cancel</a>
+</form></div></div></div></div>{% endblock %}

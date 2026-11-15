@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Dashboard | CampusFind{% endblock %}
+{% block content %}
+<h1 class="h2 mb-4">Dashboard</h1>
+<div class="row g-3 mb-4"><div class="col-md-3"><div class="stat-card"><div class="text-muted">My lost reports</div><div class="display-6">{{ lost_count }}</div></div></div><div class="col-md-3"><div class="stat-card"><div class="text-muted">My found reports</div><div class="display-6">{{ found_count }}</div></div></div><div class="col-md-3"><div class="stat-card"><div class="text-muted">My claims</div><div class="display-6">{{ claim_count }}</div></div></div>{% if can_manage_items %}<div class="col-md-3"><div class="stat-card"><div class="text-muted">All reports</div><div class="display-6">{{ total_items }}</div></div></div>{% endif %}</div>
+<div class="row g-4"><div class="col-lg-6"><div class="card"><div class="card-body"><h2 class="h5">My recent reports</h2>
+{% for item in my_items %}<div class="border-bottom py-2"><a href="{% url 'item_detail' item.pk %}">{{ item.name }}</a><span class="text-muted small"> · {{ item.get_report_type_display }} · {{ item.get_status_display }}</span></div>{% empty %}<p class="text-muted">You have not submitted any reports.</p>{% endfor %}
+<a class="btn btn-sm btn-outline-primary mt-3" href="{% url 'item_create' %}">Create report</a></div></div></div>
+<div class="col-lg-6"><div class="card"><div class="card-body"><h2 class="h5">My claims</h2>
+{% for claim in my_claims %}<div class="border-bottom py-2">{% if claim.item.status == 'OPEN' %}<a href="{% url 'item_detail' claim.item.pk %}">{% endif %}{{ claim.item.get_public_type_display }} · Reference #{{ claim.item.pk }}{% if claim.item.status == 'OPEN' %}</a>{% endif %}<span class="text-muted small"> · {{ claim.get_status_display }}</span></div>{% empty %}<p class="text-muted">You have not submitted any claims.</p>{% endfor %}</div></div></div></div>
+{% if can_manage_items %}<div class="d-flex justify-content-end gap-2 mt-3"><a class="btn btn-sm btn-outline-secondary" href="{% url 'export_csv' %}">Export CSV</a><a class="btn btn-sm btn-outline-secondary" href="{% url 'export_pdf' %}">Export PDF</a></div>{% endif %}
+{% if can_review_claims %}<div class="card mt-4"><div class="card-body"><h2 class="h5">Claims requiring attention</h2>
+{% for claim in pending_claims %}<div class="border-bottom py-3"><strong>{{ claim.item.name }}</strong> — {{ claim.claimant.username }} <span class="text-muted">({{ claim.get_status_display }})</span><p class="small mb-1">{{ claim.proof_description }}</p><a href="{% url 'claim_review' claim.pk %}">Review claim</a></div>{% empty %}<p class="text-muted">No pending claims.</p>{% endfor %}</div></div>{% endif %}
+{% endblock %}

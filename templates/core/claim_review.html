@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Review claim | CampusFind{% endblock %}
+{% block content %}
+<div class="row justify-content-center"><div class="col-lg-10"><div class="card shadow-sm"><div class="card-body p-4">
+<h1 class="h3">Private ownership verification</h1>
+<p class="text-muted">Compare the claimant's answers with the original private report. Do not approve based only on the matching score or broad item type.</p>
+<div class="row g-3">
+  <div class="col-md-6"><div class="border rounded p-3 h-100"><h2 class="h5">Original found-item report</h2>
+    <p><strong>Reference:</strong> #{{ claim.item.pk }}<br><strong>Public type:</strong> {{ claim.item.get_public_type_display }}<br><strong>Private name:</strong> {{ claim.item.name }}<br><strong>Category:</strong> {{ claim.item.category }}<br><strong>Colour:</strong> {{ claim.item.colour|default:"Not specified" }}<br><strong>Date:</strong> {{ claim.item.date_lost_found }}<br><strong>Exact location:</strong> {{ claim.item.location }}</p>
+    <p><strong>Description:</strong><br>{{ claim.item.description|linebreaksbr }}</p>
+    <p><strong>Hidden identifying features:</strong><br>{{ claim.item.identifying_features|default:"Not specified"|linebreaksbr }}</p>
+    {% if claim.item.image %}<a class="btn btn-sm btn-outline-secondary" href="{% url 'private_item_image' claim.item.pk %}" target="_blank" rel="noopener">Open protected original image</a>{% endif %}
+    <p class="small text-muted mt-2">Reported by: {{ claim.item.reported_by.username }}</p>
+  </div></div>
+  <div class="col-md-6"><div class="border rounded p-3 h-100"><h2 class="h5">Claimant's submission</h2>
+    <p><strong>Claimant:</strong> {{ claim.claimant.username }}<br><strong>Submitted:</strong> {{ claim.created_at }}<br><strong>Current status:</strong> {{ claim.get_status_display }}</p>
+    <p><strong>Claimant's ownership answers:</strong><br>{{ claim.proof_description|linebreaksbr }}</p>
+    {% if claim.matched_lost_item %}<hr><h3 class="h6">Claimant's linked lost report</h3>
+      <p><strong>Report:</strong> #{{ claim.matched_lost_item.pk }}<br><strong>Exact name:</strong> {{ claim.matched_lost_item.name }}<br><strong>Colour:</strong> {{ claim.matched_lost_item.colour }}<br><strong>Location:</strong> {{ claim.matched_lost_item.location }}<br><strong>Description:</strong> {{ claim.matched_lost_item.description|linebreaksbr }}<br><strong>Identifying features:</strong> {{ claim.matched_lost_item.identifying_features|linebreaksbr }}</p>
+      {% if claim.matched_lost_item.image %}<a class="btn btn-sm btn-outline-secondary" href="{% url 'private_item_image' claim.matched_lost_item.pk %}" target="_blank" rel="noopener">Open linked lost-item image</a>{% endif %}
+    {% else %}<p class="text-muted">No linked lost-item report was provided.</p>{% endif %}
+  </div></div>
+</div>
+<div class="alert alert-warning mt-3">Approval marks the found report as Claimed. Verify evidence manually and arrange a safe handover. Mark the claim Returned only after physical return.</div>
+<form method="post" class="mt-3">{% csrf_token %}
+  {% if form.non_field_errors %}<div class="alert alert-danger">{{ form.non_field_errors }}</div>{% endif %}
+  {% for field in form %}<div class="mb-3"><label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% for error in field.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}</div>{% endfor %}
+  <button class="btn btn-primary">Save verification decision</button><a class="btn btn-link" href="{% url 'dashboard' %}">Cancel</a>
+</form>
+</div></div></div></div>
+{% endblock %}

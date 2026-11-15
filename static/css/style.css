@@ -1,0 +1,13 @@
+body { background: #f6f8fb; color: #1f2937; }
+.navbar-brand { letter-spacing: .2px; }
+.hero { background: linear-gradient(120deg, #173b70, #3478b9); color: white; }
+.card { border: 0; border-radius: 14px; overflow: hidden; }
+.item-thumb { height: 190px; object-fit: cover; }
+.detail-image { width: 100%; max-height: 380px; object-fit: contain; background: #eef2f7; }
+.placeholder-thumb { height: 190px; display:flex; align-items:center; justify-content:center; background:#e9eef5; color:#6b7280; }
+.stat-card { background: white; border-radius: 14px; padding: 20px; box-shadow: 0 2px 12px rgba(20,40,70,.06); }
+form p { margin-bottom: 1rem; }
+form p label { display:block; font-weight:600; margin-bottom:.35rem; }
+form p input, form p select, form p textarea { width:100%; padding:.55rem .7rem; border:1px solid #ced4da; border-radius:8px; }
+input.form-control, select.form-select { border-radius: 9px; }
+footer { background: #fff; }

@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Browse items | CampusFind{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div><h1 class="h2">Browse reports</h1><p class="text-muted mb-0">Public listings reveal only the broad item type. Identifying details are kept private for verification.</p></div>
+  {% if user.is_authenticated %}<a class="btn btn-primary" href="{% url 'item_create' %}">+ Report item</a>{% endif %}
+</div>
+<div class="row"><div class="col-lg-8">
+  <input id="live-search" class="form-control form-control-lg mb-2" placeholder="Search broad item type: laptop, book, bag..." value="{{ query }}">
+  <div id="live-results" class="list-group mb-3"></div>
+</div></div>
+<form method="get" class="row g-2 mb-4">
+  <div class="col-md-3"><select class="form-select" name="type"><option value="">All reports</option><option value="LOST" {% if selected_type == 'LOST' %}selected{% endif %}>Lost</option><option value="FOUND" {% if selected_type == 'FOUND' %}selected{% endif %}>Found</option></select></div>
+  <div class="col-md-7"><input class="form-control" name="q" value="{{ query }}" placeholder="Broad item type only (e.g. laptop)"></div>
+  <div class="col-md-2"><button class="btn btn-dark w-100">Filter</button></div>
+</form>
+<div class="row g-3">
+{% for item in items %}
+  <div class="col-md-4"><div class="card h-100 shadow-sm"><div class="card-body">
+    <span class="badge {% if item.report_type == 'LOST' %}text-bg-danger{% else %}text-bg-success{% endif %}">{{ item.get_report_type_display }}</span>
+    <div class="display-6 my-3" aria-hidden="true">{% if item.public_type == 'LAPTOP' %}💻{% elif item.public_type == 'PHONE' %}📱{% elif item.public_type == 'BOOK' %}📘{% elif item.public_type == 'BAG' %}🎒{% elif item.public_type == 'KEYS' %}🔑{% elif item.public_type == 'WALLET' %}👛{% else %}📦{% endif %}</div>
+    <h2 class="h5">{{ item.get_public_type_display }}</h2>
+    <p class="small text-muted">Reference #{{ item.pk }}</p>
+    <a class="btn btn-outline-primary btn-sm" href="{% url 'item_detail' item.pk %}">View limited details</a>
+  </div></div></div>
+{% empty %}<p>No matching public reports found.</p>{% endfor %}
+</div>
+{% endblock %}
+{% block scripts %}<script>
+const searchInput = document.getElementById("live-search");
+const results = document.getElementById("live-results");
+let timer;
+searchInput.addEventListener("input", () => {
+  clearTimeout(timer);
+  timer = setTimeout(async () => {
+    const q = searchInput.value.trim();
+    if (!q) { results.replaceChildren(); return; }
+    try {
+      const response = await fetch("{% url 'live_search' %}?q=" + encodeURIComponent(q), {headers: {"X-Requested-With": "XMLHttpRequest"}});
+      if (!response.ok) throw new Error("Search failed");
+      const data = await response.json();
+      results.replaceChildren();
+      data.results.forEach(item => {
+        const link = document.createElement("a");
+        link.href = item.url;
+        link.className = "list-group-item list-group-item-action";
+        // textContent prevents untrusted report text from being interpreted as HTML.
+        link.textContent = `${item.item_type} · ${item.report_type} · Reference #${item.id}`;
+        results.appendChild(link);
+      });
+      if (!data.results.length) results.textContent = "No public results found.";
+    } catch (error) { results.textContent = "Search is temporarily unavailable."; }
+  }, 250);
+});
+</script>{% endblock %}

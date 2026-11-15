@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+{% block title %}Item report #{{ item.pk }} | CampusFind{% endblock %}
+{% block content %}
+<div class="row justify-content-center"><div class="col-lg-8">
+  <div class="card shadow-sm"><div class="card-body p-4">
+    <div class="d-flex justify-content-between align-items-start gap-2">
+      <div><span class="badge {% if item.report_type == 'LOST' %}text-bg-danger{% else %}text-bg-success{% endif %}">{{ item.get_report_type_display }}</span>
+      <span class="badge text-bg-secondary">{{ item.get_status_display }}</span></div>
+      <span class="text-muted small">Reference #{{ item.pk }}</span>
+    </div>
+    <h1 class="h3 mt-3">{{ item.get_public_type_display }}</h1>
+    {% if private_view %}
+      <div class="alert alert-info">You are viewing private report details because you are the reporter or an authorised staff member.</div>
+      <h2 class="h5 mt-3">Private report details</h2>
+      {% if private_image_url %}<img src="{{ private_image_url }}" class="detail-image mb-3" alt="Private evidence for report #{{ item.pk }}">{% endif %}
+      <dl class="row">
+        <dt class="col-sm-4">Exact item name</dt><dd class="col-sm-8">{{ item.name }}</dd>
+        <dt class="col-sm-4">Category</dt><dd class="col-sm-8">{{ item.category }}</dd>
+        <dt class="col-sm-4">Colour</dt><dd class="col-sm-8">{{ item.colour|default:"Not specified" }}</dd>
+        <dt class="col-sm-4">Date lost / found</dt><dd class="col-sm-8">{{ item.date_lost_found }}</dd>
+        <dt class="col-sm-4">Exact location</dt><dd class="col-sm-8">{{ item.location }}</dd>
+        <dt class="col-sm-4">Description</dt><dd class="col-sm-8">{{ item.description|linebreaksbr }}</dd>
+        <dt class="col-sm-4">Identifying features</dt><dd class="col-sm-8">{{ item.identifying_features|default:"Not specified"|linebreaksbr }}</dd>
+        {% if user.is_staff %}<dt class="col-sm-4">Reported by</dt><dd class="col-sm-8">{{ item.reported_by.username }}</dd>{% endif %}
+      </dl>
+    {% else %}
+      <div class="alert alert-secondary mt-3 mb-3"><strong>Privacy protection:</strong> the exact identity, photograph, description, colour, date and location are hidden from public users. They are checked by authorised staff during ownership verification.</div>
+      <p class="text-muted">No additional identifying information is publicly available.</p>
+    {% endif %}
+
+    {% if item.report_type == 'FOUND' %}<hr>
+      {% if item.status != 'OPEN' %}
+        <div class="alert alert-secondary mb-0">This item is no longer accepting new claims.</div>
+      {% elif can_claim %}
+        {% if existing_claim %}
+          <div class="alert alert-info mb-0">You have already submitted a claim for this report. Status: <strong>{{ existing_claim.get_status_display }}</strong>.</div>
+        {% else %}
+          <h2 class="h5">Request an ownership check</h2>
+          <p class="small text-muted">Describe details that only the genuine owner is likely to know. Your answers are private and visible to authorised staff only. The system's matching score, if any, is not proof of ownership.</p>
+          <form method="post">{% csrf_token %}
+            {% if claim_form.non_field_errors %}<div class="alert alert-danger">{{ claim_form.non_field_errors }}</div>{% endif %}
+            {% for field in claim_form %}<div class="mb-3"><label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}{% for error in field.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}</div>{% endfor %}
+            <button class="btn btn-primary">Submit private claim</button>
+          </form>
+        {% endif %}
+      {% elif user.is_authenticated and item.reported_by_id == user.pk %}
+        <div class="alert alert-secondary mb-0">This is your own found-item report. You cannot submit a claim against it.</div>
+      {% elif not user.is_authenticated %}
+        <a class="btn btn-primary" href="{% url 'login' %}">Login to request an ownership check</a>
+      {% endif %}
+    {% endif %}
+
+    {% if can_manage_items %}
+      <hr>
+      <section aria-labelledby="match-comparisons-heading">
+        <h2 class="h5" id="match-comparisons-heading">Lost / Found similarity comparisons (authorised staff only)</h2>
+        <p class="small text-muted mb-3">
+          Every opposite-type report is scored and shown, including low scores and reports that are no longer open.
+          Scores rank textual and descriptive similarity; they are not probabilities or proof of ownership.
+        </p>
+        {% if matches %}
+          {% for match in matches %}
+            <div class="border rounded p-3 mb-2">
+              <div class="d-flex flex-wrap justify-content-between align-items-start gap-2">
+                <div>
+                  <strong>Reference #{{ match.item.pk }} · {{ match.item.name }}</strong>
+                  <div class="small text-muted">
+                    {{ match.item.get_report_type_display }} · {{ match.item.get_status_display }}
+                    · {{ match.confidence }}
+                  </div>
+                </div>
+                <div class="text-end">
+                  <strong class="fs-5">{{ match.score }}/100</strong>
+                  {% if match.recommendation_eligible %}
+                    <span class="badge text-bg-success d-block">Meets recommendation criteria</span>
+                  {% else %}
+                    <span class="badge text-bg-secondary d-block">Comparison only</span>
+                  {% endif %}
+                </div>
+              </div>
+              <div class="progress mt-2" role="progressbar" aria-label="Similarity score"
+                   aria-valuenow="{{ match.score }}" aria-valuemin="0" aria-valuemax="100" style="height: 8px;">
+                <div class="progress-bar {% if match.recommendation_eligible %}bg-success{% else %}bg-secondary{% endif %}"
+                     style="width: {{ match.score }}%"></div>
+              </div>
+              <details class="mt-2">
+                <summary class="small">View score breakdown and review notes</summary>
+                <div class="row small mt-2">
+                  <div class="col-sm-6">
+                    <div>Name: {{ match.breakdown.name }}%</div>
+                    <div>Category: {{ match.breakdown.category }}%</div>
+                    <div>Description: {{ match.breakdown.description }}%</div>
+                    <div>Identifying features: {{ match.breakdown.features }}%</div>
+                  </div>
+                  <div class="col-sm-6">
+                    <div>Colour: {{ match.breakdown.colour }}%</div>
+                    <div>Location: {{ match.breakdown.location }}%</div>
+                    <div>Date proximity: {{ match.breakdown.date }}%</div>
+                    <div>Data coverage: {{ match.coverage }}%</div>
+                    <div>Identity evidence: {{ match.identity_evidence }}%</div>
+                    <div>Penalties: {{ match.breakdown.penalties }}</div>
+                  </div>
+                </div>
+                {% if match.warnings %}
+                  <div class="mt-2">
+                    {% for warning in match.warnings %}<div class="text-warning-emphasis small">• {{ warning }}</div>{% endfor %}
+                  </div>
+                {% endif %}
+                {% if match.reasons %}
+                  <div class="small text-muted mt-2">Positive signals: {{ match.reasons|join:", " }}</div>
+                {% endif %}
+              </details>
+            </div>
+          {% endfor %}
+        {% else %}
+          <p class="text-muted mb-0">There are currently no reports of the opposite type to compare with this item.</p>
+        {% endif %}
+      </section>
+    {% endif %}
+  </div></div>
+</div></div>
+{% endblock %}
