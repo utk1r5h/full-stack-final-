@@ -8,7 +8,6 @@ from django.contrib.auth import login
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
-from django.db.models import Q
 from django.http import FileResponse, Http404, HttpResponse, HttpResponseForbidden, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_GET
@@ -17,7 +16,7 @@ from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 
 from .forms import RegisterForm, ItemForm, ClaimForm, ClaimReviewForm
-from .matching import possible_matches
+from .matching import candidate_matches, possible_matches
 from .models import Item, Claim
 from .services import save_claim_decision
 
@@ -71,6 +70,10 @@ def register_view(request):
 def dashboard(request):
     my_items = Item.objects.filter(reported_by=request.user)
     my_claims = Claim.objects.filter(claimant=request.user).select_related("item")
+    open_lost_items = my_items.filter(
+        report_type=Item.ReportType.LOST,
+        status=Item.Status.OPEN,
+    )[:5]
     context = {
         "my_items": my_items[:5],
         "my_claims": my_claims[:5],
@@ -79,14 +82,25 @@ def dashboard(request):
         "claim_count": my_claims.count(),
         "can_manage_items": _can_manage_items(request.user),
         "can_review_claims": _can_review_claims(request.user),
+        "lost_report_matches": [
+            {"item": item, "matches": candidate_matches(item)}
+            for item in open_lost_items
+        ],
     }
     if context["can_manage_items"]:
         context["total_items"] = Item.objects.count()
+        context["open_lost_count"] = Item.objects.filter(
+            report_type=Item.ReportType.LOST, status=Item.Status.OPEN
+        ).count()
+        context["open_found_count"] = Item.objects.filter(
+            report_type=Item.ReportType.FOUND, status=Item.Status.OPEN
+        ).count()
         context["returned_count"] = Item.objects.filter(status=Item.Status.RETURNED).count()
     if context["can_review_claims"]:
         context["pending_claims"] = Claim.objects.filter(
             status__in=[Claim.Status.PENDING, Claim.Status.VERIFYING]
         ).select_related("item", "claimant", "matched_lost_item")
+        context["pending_claim_count"] = context["pending_claims"].count()
     return render(request, "core/dashboard.html", context)
 
 
@@ -111,9 +125,13 @@ def item_list(request):
         "id", "public_type", "report_type", "status", "created_at"
     )
     report_type = request.GET.get("type", "")
+    public_type = request.GET.get("public_type", "")
     query = request.GET.get("q", "").strip()[:80]
     if report_type in (Item.ReportType.LOST, Item.ReportType.FOUND):
         items = items.filter(report_type=report_type)
+    valid_public_types = {value for value, _label in Item.PublicType.choices}
+    if public_type in valid_public_types:
+        items = items.filter(public_type=public_type)
     if query:
         # Search only the intentionally public label. Do not search private fields,
         # because search-result existence can itself disclose private information.
@@ -124,6 +142,7 @@ def item_list(request):
         "public_types": public_types,
         "query": query,
         "selected_type": report_type,
+        "selected_public_type": public_type,
     })
 
 
@@ -132,6 +151,13 @@ def live_search(request):
     """AJAX search returns only the same minimal public fields as the browse page."""
     query = request.GET.get("q", "").strip()[:80]
     items = Item.objects.filter(status=Item.Status.OPEN)
+    report_type = request.GET.get("type", "")
+    public_type = request.GET.get("public_type", "")
+    if report_type in (Item.ReportType.LOST, Item.ReportType.FOUND):
+        items = items.filter(report_type=report_type)
+    valid_public_types = {value for value, _label in Item.PublicType.choices}
+    if public_type in valid_public_types:
+        items = items.filter(public_type=public_type)
     if query:
         items = items.filter(public_type__icontains=query)
     data = [{
@@ -194,6 +220,12 @@ def item_detail(request, pk):
             except ValidationError as exc:
                 claim_form.add_error(None, exc)
 
+    is_owner_of_open_lost_report = bool(
+        request.user.is_authenticated
+        and item.reported_by_id == request.user.pk
+        and item.report_type == Item.ReportType.LOST
+        and item.status == Item.Status.OPEN
+    )
     context = {
         "item": item,
         "private_view": private_view,
@@ -202,6 +234,8 @@ def item_detail(request, pk):
         "existing_claim": existing_claim,
         "can_claim": can_claim,
         "can_manage_items": _can_manage_items(request.user),
+        "show_user_matches": is_owner_of_open_lost_report,
+        "user_matches": candidate_matches(item) if is_owner_of_open_lost_report else [],
         # Complete pairwise comparisons are available only to authorised staff.
         "matches": possible_matches(item) if _can_manage_items(request.user) else [],
     }

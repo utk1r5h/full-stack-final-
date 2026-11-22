@@ -6,7 +6,7 @@ A Django application for a college lost-and-found process. This build adds **ser
 
 - User registration, login and personal dashboard
 - Lost and found report creation with optional private image upload
-- Public browse and AJAX search that reveal only broad item type, Lost/Found status and reference number
+- Public browse and AJAX search with Lost/Found and public item-type filters; results reveal only broad item type and reference number
 - Private item name, category, description, colour, date, exact location, identifying features and photo
 - Staff-only Django Admin management of complete item reports and claims
 - Private claim submissions with a required 30–2,000 character ownership explanation and optional link to the claimant's own lost report
@@ -14,7 +14,7 @@ A Django application for a college lost-and-found process. This build adds **ser
 - Admin review page that compares submitted ownership evidence with the original private found report
 - Only one claim can be approved/returned per found item; claim states cannot move backwards from Rejected or Returned
 - Claim decisions synchronise found and linked lost report statuses
-- Explainable hybrid lost/found matching engine, with match details restricted to authorised item staff
+- Explainable hybrid lost/found matching engine; owners of open lost reports see all open found-item references of the same public type, ranked by similarity, while full match details remain staff-only
 - CSV/PDF exports protected by staff permission checks
 - Uploaded image endpoint that checks reporter/staff access; no public `/media/` serving route
 
@@ -29,9 +29,11 @@ A Django application for a college lost-and-found process. This build adds **ser
 | Exact location and identifying features | No | Own report only | Yes |
 | Uploaded photograph | No | Own report only | Yes |
 | All claims and internal admin notes | No | Own claims only (status) | Yes |
-| Matching score and internal match suggestions | No | No | Yes |
+| Public match suggestion (item type and reference only) | No | Own open lost reports only | Yes |
+| Similarity percentage | No | Own open lost reports only | Yes |
+| Detailed score breakdown and comparison | No | No | Yes |
 
-Privacy is enforced in Django views and the private image endpoint, not merely by hiding HTML. Public search only queries the broad `public_type` field. Claimants cannot read the hidden fields from the item-detail page or AJAX response. A claimant's own linked lost-item report can be selected in the claim form, but other users' reports are not exposed.
+Privacy is enforced in Django views and the private image endpoint, not merely by hiding HTML. Public search only queries the broad `public_type` field. Claimants cannot read hidden fields from the item-detail page or AJAX response. Owners of open lost reports receive references, public item types, and similarity percentages for all open found reports of the same public type; detailed score breakdowns and private comparison details remain staff-only. The percentage is a ranking signal, not a probability or proof of ownership. A claimant's own linked lost-item report can be selected in the claim form, but other users' reports are not exposed.
 
 **Claim matching is not ownership verification.** A high similarity score never approves a claim. Staff must manually compare evidence the claimant submits with the original private report. Do not store account passwords, OTPs or account recovery codes in item evidence.
 
@@ -153,5 +155,8 @@ category checks now affect only `recommendation_eligible`; they no longer
 remove the comparison from staff visibility. The displayed score is a
 similarity ranking, not a probability or proof of ownership.
 
-Non-authorised users do not receive comparison results in the view context,
-and the template checks the same `can_manage_items` permission flag.
+The full comparison list and its private fields remain limited to authorised
+staff. Owners of their own open lost report receive all open found-item
+references of the same public type, ranked with a similarity percentage. The
+view does not render detailed score breakdowns or private candidate fields for
+them; the percentage is a ranking signal, not a probability or proof.

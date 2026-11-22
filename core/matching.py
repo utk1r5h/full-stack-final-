@@ -292,3 +292,27 @@ def possible_matches(item: Item, limit: int | None = None) -> list[dict]:
         reverse=True,
     )
     return results if limit is None else results[:limit]
+
+
+def candidate_matches(item: Item, limit: int | None = None) -> list[dict]:
+    """Return all open found reports of the same public type, ranked by similarity."""
+    if item.report_type != Item.ReportType.LOST or item.status != Item.Status.OPEN:
+        return []
+
+    candidates = (
+        Item.objects.filter(
+            report_type=Item.ReportType.FOUND,
+            status=Item.Status.OPEN,
+            public_type=item.public_type,
+        )
+        .exclude(pk=item.pk)
+        .exclude(claims__status__in=[Claim.Status.APPROVED, Claim.Status.RETURNED])
+        .distinct()
+        .select_related("reported_by")
+    )
+    results = [score_pair(item, candidate) for candidate in candidates.iterator()]
+    results.sort(
+        key=lambda result: (result["score"], result["coverage"]),
+        reverse=True,
+    )
+    return results if limit is None else results[:max(0, limit)]

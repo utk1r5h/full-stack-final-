@@ -5,15 +5,13 @@
   <div><h1 class="h2">Browse reports</h1><p class="text-muted mb-0">Public listings reveal only the broad item type. Identifying details are kept private for verification.</p></div>
   {% if user.is_authenticated %}<a class="btn btn-primary" href="{% url 'item_create' %}">+ Report item</a>{% endif %}
 </div>
-<div class="row"><div class="col-lg-8">
-  <input id="live-search" class="form-control form-control-lg mb-2" placeholder="Search broad item type: laptop, book, bag..." value="{{ query }}">
-  <div id="live-results" class="list-group mb-3"></div>
-</div></div>
-<form method="get" class="row g-2 mb-4">
+<form id="public-filters" method="get" class="row g-2 mb-4">
   <div class="col-md-3"><select class="form-select" name="type"><option value="">All reports</option><option value="LOST" {% if selected_type == 'LOST' %}selected{% endif %}>Lost</option><option value="FOUND" {% if selected_type == 'FOUND' %}selected{% endif %}>Found</option></select></div>
-  <div class="col-md-7"><input class="form-control" name="q" value="{{ query }}" placeholder="Broad item type only (e.g. laptop)"></div>
+  <div class="col-md-3"><select class="form-select" name="public_type"><option value="">All public item types</option>{% for value, label in public_types %}<option value="{{ value }}" {% if selected_public_type == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
+  <div class="col-md-4"><input id="live-search" class="form-control" name="q" value="{{ query }}" placeholder="Search public item type"></div>
   <div class="col-md-2"><button class="btn btn-dark w-100">Filter</button></div>
 </form>
+<div id="live-results" class="list-group mb-3"></div>
 <div class="row g-3">
 {% for item in items %}
   <div class="col-md-4"><div class="card h-100 shadow-sm"><div class="card-body">
@@ -29,27 +27,34 @@
 {% block scripts %}<script>
 const searchInput = document.getElementById("live-search");
 const results = document.getElementById("live-results");
+const filterForm = document.getElementById("public-filters");
 let timer;
+async function updateLiveResults() {
+  const params = new URLSearchParams(new FormData(filterForm));
+  if (!params.get("q") && !params.get("type") && !params.get("public_type")) {
+    results.replaceChildren();
+    return;
+  }
+  try {
+    const response = await fetch("{% url 'live_search' %}?" + params.toString(), {headers: {"X-Requested-With": "XMLHttpRequest"}});
+    if (!response.ok) throw new Error("Search failed");
+    const data = await response.json();
+    results.replaceChildren();
+    data.results.forEach(item => {
+      const link = document.createElement("a");
+      link.href = item.url;
+      link.className = "list-group-item list-group-item-action";
+      // textContent prevents untrusted report text from being interpreted as HTML.
+      link.textContent = `${item.item_type} · ${item.report_type} · Reference #${item.id}`;
+      results.appendChild(link);
+    });
+    if (!data.results.length) results.textContent = "No public results found.";
+  } catch (error) { results.textContent = "Search is temporarily unavailable."; }
+}
 searchInput.addEventListener("input", () => {
   clearTimeout(timer);
-  timer = setTimeout(async () => {
-    const q = searchInput.value.trim();
-    if (!q) { results.replaceChildren(); return; }
-    try {
-      const response = await fetch("{% url 'live_search' %}?q=" + encodeURIComponent(q), {headers: {"X-Requested-With": "XMLHttpRequest"}});
-      if (!response.ok) throw new Error("Search failed");
-      const data = await response.json();
-      results.replaceChildren();
-      data.results.forEach(item => {
-        const link = document.createElement("a");
-        link.href = item.url;
-        link.className = "list-group-item list-group-item-action";
-        // textContent prevents untrusted report text from being interpreted as HTML.
-        link.textContent = `${item.item_type} · ${item.report_type} · Reference #${item.id}`;
-        results.appendChild(link);
-      });
-      if (!data.results.length) results.textContent = "No public results found.";
-    } catch (error) { results.textContent = "Search is temporarily unavailable."; }
-  }, 250);
+  timer = setTimeout(updateLiveResults, 250);
 });
+filterForm.elements.type.addEventListener("change", updateLiveResults);
+filterForm.elements.public_type.addEventListener("change", updateLiveResults);
 </script>{% endblock %}
